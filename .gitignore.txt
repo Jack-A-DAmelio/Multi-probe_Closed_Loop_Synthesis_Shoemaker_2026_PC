@@ -1,0 +1,8 @@
+# Python cache directories
+__pycache__/
+
+# Compiled Python files
+*.pyc
+
+# Windows metadata
+desktop.ini
