@@ -1,7 +1,7 @@
 """
 PC server (MINIMAL TEST VERSION)
 
-Author: Undergraduate Research Project | Date: 2026-06-18 | Hardware Version: v0.1
+Author: Jack A. D'Amelio | Date: 2026-06-18 | Hardware Version: v0.1
 
 Purpose:
 --------
@@ -17,17 +17,16 @@ between the Pi hardware and the PC dashboard.
 from fastapi import FastAPI
 from typing import List, Dict, Any
 import csv
-import os
 import time
 
-app = FastAPI()
+app = FastAPI()# Initialize FastAPI application instance. This is the server that will handle incoming HTTP requests from the Pi and dashboard clients.
 
 
 # =========================================================
 # CONFIGURATION
 # =========================================================
 
-# Global configuration dictionary for runtime parameters
+# Global configuration dictionary for runtime parameters, which can be modified via API endpoints. This allows dynamic control of the server's behavior without restarting it.
 CONFIG = {
     "csv_file": "experiment_data.csv",  # active output file for logging
     "experiment_id": None               # current experiment identifier
@@ -72,7 +71,7 @@ def init_csv():
     This overwrites the file header each time it is called.
     """
 
-    with open(CONFIG["csv_file"], mode="w", newline="") as f:
+    with open(CONFIG["csv_file"], mode="w", newline="") as f: #create or overwrite the CSV file specified in the CONFIG dictionary. The 'w' mode ensures that any existing file is cleared, and 'newline=""' prevents extra blank lines on Windows systems.
         writer = csv.writer(f)
 
         # CSV header defines expected structure of incoming data
@@ -85,15 +84,15 @@ def init_csv():
         ])
 
 
-# Initialize default CSV file at server startup
+# Initialize default CSV file at server startup, this line runs when the server is first launched, ensuring that the CSV file is ready to receive data immediately.
 init_csv()
 
 
 # =========================================================
 # API ENDPOINT: FILE CONTROL
 # =========================================================
-
-@app.post("/filename")
+#API endpoints are functions which are run when a specific HTTP request is made to the server. The @app.post("/filename") decorator indicates that this function will handle POST requests sent to the "/filename" URL path. This endpoint allows clients (like the dashboard or Pi) to set or change the filename used for logging data to a CSV file.
+@app.post("/filename") 
 def set_filename(data: dict):
     """
     Sets output CSV filename for logging.
@@ -108,7 +107,7 @@ def set_filename(data: dict):
     filename = data.get("filename")
 
     if not filename:
-        return {"status": "error", "message": "No filename provided"}
+        return {"status": "error", "message": "No filename provided"} #returns the error message to the raspberry pi if no filename is provided in the request data.
 
     # Ensure consistent file format
     if not filename.endswith(".csv"):
@@ -144,7 +143,7 @@ def set_experiment(data: dict):
     experiment_id = data.get("experiment_id")
 
     if not experiment_id:
-        return {"status": "error", "message": "No experiment_id provided"}
+        return {"status": "error", "message": "No experiment_id provided"}#returns the error message to the raspberry pi if no experiment_id is provided in the request data.
 
     CONFIG["experiment_id"] = experiment_id
 
@@ -186,7 +185,7 @@ def ingest(data: dict):
         # HANDLE SINGLE OR BATCH PACKET FORMAT
         # ---------------------------------------------------------
 
-        packets = data["batch"] if "batch" in data else [data]
+        packets = data["batch"] if "batch" in data else [data] #checks if the incoming data contains a "batch" key. If it does, it treats the value as a list of packets; if not, it wraps the single packet in a list for uniform processing.
 
         for packet in packets:
 
@@ -253,4 +252,4 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=False
-    )
+    ) #This line starts the Uvicorn server, which serves the FastAPI application. The 'host' parameter allows external devices on the same network to connect, and 'port' specifies the listening port. The 'reload=False' option disables automatic reloading of the server on code changes, which is suitable for production environments.

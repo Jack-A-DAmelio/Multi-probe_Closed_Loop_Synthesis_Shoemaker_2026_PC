@@ -25,8 +25,8 @@ from helpers import (
 # CONFIGURATION
 # =========================================================
 
-PI_URL = "http://127.0.0.1:8001"
-PC_URL = "http://127.0.0.1:8000"
+PI_URL = "http://10.193.222.216:8001"
+PC_URL = "http://130.126.252.137:8000"
 
 PROBES = ["temperature", "pressure", "pH"]
 
