@@ -1,13 +1,14 @@
 """
 PC API CLIENT (requests wrapper)
-Author: Undergraduate Research Project
+Author: Jack A. D'Amelio | Date: 2026-06-18 | Hardware Version: v0.1
 Date: 2026-06-18
 Internal Pi-Hardware Version: v0.1
 
 Purpose:
 --------
-Lightweight client for communicating with the PC server.
-This module ONLY handles HTTP requests (no processing logic).
+This code handles the requests for communicating with the PC server.
+This code is used by dashboard.py to retrieve data from the PC server and send commands to it.
+The endpoints are defined in pc_server.py
 """
 
 import requests
