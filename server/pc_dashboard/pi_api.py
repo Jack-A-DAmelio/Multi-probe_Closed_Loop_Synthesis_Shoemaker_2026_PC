@@ -50,6 +50,54 @@ def configure_experiment(pi_url, experiment_id, enabled_probes, flush_interval_s
     return response.json()
 
 
+
+def get_modules(pi_url):
+    """
+    Returns all available module names.
+    """
+
+    return requests.get(
+        f"{pi_url}/modules"
+    ).json()
+
+
+def get_module_spec(pi_url, module_name):
+    """
+    Returns module specification.
+
+    Example:
+    {
+        "name": "LEDModule",
+        "pins_required": {
+            "red": "Red LED output",
+            "green": "Green LED output",
+            "yellow": "Yellow LED output"
+        }
+    }
+    """
+
+    return requests.get(
+        f"{pi_url}/modules/{module_name}/spec"
+    ).json()
+
+
+def build_module(pi_url, module_name, pin_map):
+    """
+    Builds a module on the Pi.
+
+    Example pin_map:
+    {
+        "red": 40,
+        "green": 38,
+        "yellow": 36
+    }
+    """
+
+    return requests.post(
+        f"{pi_url}/modules/{module_name}/build",
+        json=pin_map
+    ).json()
+
 # =========================================================
 # START STREAMING
 # =========================================================
