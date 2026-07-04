@@ -11,7 +11,7 @@ A Pane is responsible for describing:
 - its title
 - its display order
 - the widgets it contains
-- optional periodic refresh behavior
+- batch submission of all widget values
 
 A Pane does NOT know anything about:
 - Dash
@@ -22,7 +22,7 @@ A Pane does NOT know anything about:
 Those responsibilities belong to the dashboard engine.
 """
 
-from typing import List
+from typing import List, Dict, Any
 
 
 # =========================================================
@@ -42,20 +42,11 @@ class Pane:
 
     Optional methods
     ----------------
+    on_submit(values)
+        Called when the user presses the pane "Confirm" button.
+
     refresh()
         Called periodically by the dashboard engine.
-
-    Notes
-    -----
-    Widgets should always be assigned as instance attributes.
-
-    Example
-    -------
-    self.temperature = NumberInput("Temperature")
-    self.start = Button("Start")
-    self.status = Status()
-
-    Widgets assigned this way are automatically registered with the pane.
     """
 
     # Display title shown above the pane
@@ -78,8 +69,6 @@ class Pane:
         self.state = state
 
         # Internal widget storage.
-        # This list is populated automatically whenever a widget is
-        # assigned to the pane.
         self.widgets: List = []
 
     # ---------------------------------------------------------
@@ -89,25 +78,12 @@ class Pane:
     def __setattr__(self, name, value):
         """
         Automatically register widgets assigned to the pane.
-
-        Parameters
-        ----------
-        name : str
-            Attribute name.
-
-        value : object
-            Value being assigned.
-
-        Returns
-        -------
-        None
         """
 
-        # Store the attribute normally.
+        # Always set attribute first
         object.__setattr__(self, name, value)
 
-        # Widgets identify themselves using the _is_widget flag.
-        # This avoids importing widgets.py and creating circular imports.
+        # Register widget if it is a Widget instance (flag-based for now)
         if getattr(value, "_is_widget", False):
 
             widgets = self.__dict__.get("widgets")
@@ -122,10 +98,24 @@ class Pane:
     def build(self):
         """
         Create widgets for this pane.
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement build()."
+        )
+
+    # ---------------------------------------------------------
+    # NEW: BATCH SUBMISSION MODEL
+    # ---------------------------------------------------------
+
+    def on_submit(self, values: Dict[str, Any]):
+        """
+        Called when the user presses the pane-level Confirm button.
 
         Parameters
         ----------
-        None
+        values : dict
+            Dictionary of all widget values in the pane.
 
         Returns
         -------
@@ -133,12 +123,10 @@ class Pane:
 
         Notes
         -----
-        This method must be implemented by subclasses.
+        This replaces all per-widget callback behavior.
+        Override this in each pane to run experiments or actions.
         """
-
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement build()."
-        )
+        pass
 
     # ---------------------------------------------------------
     # OPTIONAL METHODS
@@ -148,18 +136,7 @@ class Pane:
         """
         Periodic update function.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
-        Notes
-        -----
         Override this method if the pane should periodically
         update displayed values.
         """
-
         pass
