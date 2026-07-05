@@ -1,55 +1,28 @@
 from dashboard_framework.pane import Pane
-from dashboard_framework.widgets import NumberInput, Button, Status
+from dashboard_framework.widgets import NumberInput, Dropdown
 
 
 class CameraPane(Pane):
 
-    TITLE = "Camera"
-    ORDER = 4
+    NAME = "camera"
 
+    TITLE = "Camera"
+
+    API_ENDPOINT = "/api/camera"
     def build(self):
 
-        # ---------------------------------------------------------
-        # INPUTS
-        # ---------------------------------------------------------
-
-        self.exposure_time = NumberInput(
-            "Exposure Time",
-            default=10,
-            minimum=1,
-            maximum=1000,
-            units="ms"
+        self.exposure = NumberInput(
+            label="exposure",
+            default=100
         )
 
-        self.filename = NumberInput(
-            "Filename ID",
-            default=1
+        self.gain = NumberInput(
+            label="gain",
+            default=1.0
         )
 
-        # ---------------------------------------------------------
-        # STATUS DISPLAY
-        # ---------------------------------------------------------
-
-        self.status = Status(
-            "Ready"
+        self.mode = Dropdown(
+            label="mode",
+            options=["normal", "high_speed"],
+            default="normal"
         )
-
-    def on_submit(self, values):
-        """
-        Called when user presses Confirm button.
-        """
-
-        exposure = values.get("Exposure Time")
-        filename = values.get("Filename ID")
-
-        # Simple placeholder logic for now
-        self.status.value = (
-            f"Capturing image {filename} "
-            f"at {exposure} ms"
-        )
-
-    def refresh(self):
-        """
-        Optional periodic update.
-        """
-        pass

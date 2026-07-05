@@ -1,358 +1,83 @@
 """
-Dashboard widget definitions.
+Widget system (v1)
 
-Author: You | Date: 2026-07-04 | Framework Version: v0.1
+Author: You | Date: 2026-07-04
 
 Purpose:
 --------
-Defines the widget classes used to build dashboard panes.
+Defines pure input field descriptors used by Panes.
 
-Widgets are lightweight Python objects that describe what should
-appear in the dashboard.
+Widgets do NOT:
+- handle UI rendering
+- store runtime state
+- handle callbacks
 
-Widgets do NOT know anything about Dash or HTML. Their only
-responsibility is storing state and validating user input.
-
-Rendering is handled by the dashboard engine.
+They ONLY describe input structure.
 """
 
-from typing import Any, Callable, List
+from dataclasses import dataclass
+from typing import Any, List, Optional
 
 
 # =========================================================
-# BASE WIDGET CLASS
+# BASE WIDGET
 # =========================================================
 
+@dataclass
 class Widget:
     """
-    Base class for all dashboard widgets.
+    Base widget definition.
 
     Parameters
     ----------
     label : str
-        Text shown beside the widget.
+        Name of the field (used in UI + payload)
 
     default : Any
-        Initial widget value.
+        Default value for the field
 
-    callback : Callable, optional
-        Function called when the widget is activated.
-
-    Returns
-    -------
-    None
+    widget_type : str
+        Type of input ("number", "text", "dropdown", etc.)
     """
 
-    def __init__(
-        self,
-        label: str = "",
-        default: Any = None,
-        callback: Callable = None
-    ):
+    label: str
+    default: Any = None
+    widget_type: str = "text"
 
-        # ---------------------------------------------------------
-        # DISPLAY INFORMATION
-        # ---------------------------------------------------------
-
-        self.label = label
-
-        self.enabled = True
-        self.visible = True
-
-        # Assigned later by the dashboard engine
-        self.widget_id = None
-
-        # ---------------------------------------------------------
-        # CALLBACK
-        # ---------------------------------------------------------
-
-        self.callback = callback
-
-        # ---------------------------------------------------------
-        # VALIDATION STATE
-        # ---------------------------------------------------------
-
-        self.valid = True
-        self.error_message = ""
-
-        # ---------------------------------------------------------
-        # VALUE STORAGE
-        # ---------------------------------------------------------
-
-        self._value = None
-        self.value = default
-
-    # ---------------------------------------------------------
-    # VALUE PROPERTY
-    # ---------------------------------------------------------
-
-    @property
-    def value(self):
-        """
-        Current widget value.
-        """
-
-        return self._value
-
-    @value.setter
-    def value(self, new_value):
-        """
-        Update the widget value after validation.
-        """
-
-        is_valid, message = self.validate(new_value)
-
-        self.valid = is_valid
-        self.error_message = message
-
-        if is_valid:
-            self._value = new_value
-
-    # ---------------------------------------------------------
-    # VALIDATION
-    # ---------------------------------------------------------
-
-    def validate(self, value):
-        """
-        Validate a new value.
-
-        Parameters
-        ----------
-        value : object
-
-        Returns
-        -------
-        tuple(bool, str)
-            (is_valid, error_message)
-        """
-
-        return True, ""
+    # internal flag for framework detection
+    _is_widget: bool = True
 
 
 # =========================================================
-# LABEL
+# SPECIFIC WIDGET TYPES
 # =========================================================
 
-class Label(Widget):
-    """
-    Read-only text label.
-    """
-
-    pass
-
-
-# =========================================================
-# STATUS
-# =========================================================
-
-class Status(Widget):
-    """
-    Status message widget.
-    """
-
-    pass
-
-
-# =========================================================
-# BUTTON
-# =========================================================
-
-class Button(Widget):
-    """
-    Push button widget.
-    """
-
-    def __init__(
-        self,
-        label: str,
-        callback: Callable = None
-    ):
-
-        super().__init__(
-            label=label,
-            callback=callback
-        )
-
-
-# =========================================================
-# TEXT INPUT
-# =========================================================
-
-class TextInput(Widget):
-    """
-    Single-line text input.
-    """
-
-    def __init__(
-        self,
-        label: str,
-        default: str = "",
-        maximum_length: int = None,
-        placeholder: str = ""
-    ):
-
-        super().__init__(
-            label=label,
-            default=default
-        )
-
-        self.maximum_length = maximum_length
-        self.placeholder = placeholder
-
-    def validate(self, value):
-
-        if not isinstance(value, str):
-            return False, "Value must be text."
-
-        if self.maximum_length is not None:
-
-            if len(value) > self.maximum_length:
-                return (
-                    False,
-                    f"Maximum length is {self.maximum_length} characters."
-                )
-
-        return True, ""
-
-
-# =========================================================
-# NUMBER INPUT
-# =========================================================
-
+@dataclass
 class NumberInput(Widget):
     """
-    Numeric input widget.
+    Numeric input field.
     """
 
-    def __init__(
-        self,
-        label: str,
-        default: float = 0,
-        minimum: float = None,
-        maximum: float = None,
-        units: str = ""
-    ):
-
-        super().__init__(
-            label=label,
-            default=default
-        )
-
-        self.minimum = minimum
-        self.maximum = maximum
-        self.units = units
-
-    def validate(self, value):
-
-        if not isinstance(value, (int, float)):
-            return False, "Value must be numeric."
-
-        if self.minimum is not None:
-
-            if value < self.minimum:
-                return (
-                    False,
-                    f"Value must be greater than or equal to {self.minimum}."
-                )
-
-        if self.maximum is not None:
-
-            if value > self.maximum:
-                return (
-                    False,
-                    f"Value must be less than or equal to {self.maximum}."
-                )
-
-        return True, ""
+    widget_type: str = "number"
+    default: float = 0.0
 
 
-# =========================================================
-# DROPDOWN
-# =========================================================
+@dataclass
+class TextInput(Widget):
+    """
+    Text input field.
+    """
 
+    widget_type: str = "text"
+    default: str = ""
+
+
+@dataclass
 class Dropdown(Widget):
     """
-    Dropdown selection widget.
+    Dropdown selection field.
     """
 
-    def __init__(
-        self,
-        label: str,
-        options: List[str],
-        default: str = None
-    ):
-
-        self.options = options
-
-        super().__init__(
-            label=label,
-            default=default
-        )
-
-    def validate(self, value):
-
-        if value not in self.options:
-
-            return (
-                False,
-                "Selection is not in the available options."
-            )
-
-        return True, ""
-
-
-# =========================================================
-# CHECKBOX
-# =========================================================
-
-class Checkbox(Widget):
-    """
-    Boolean checkbox widget.
-    """
-
-    def validate(self, value):
-
-        if not isinstance(value, bool):
-
-            return (
-                False,
-                "Checkbox value must be True or False."
-            )
-
-        return True, ""
-
-
-# =========================================================
-# GRAPH
-# =========================================================
-
-class Graph(Widget):
-    """
-    Graph display widget.
-    """
-
-    pass
-
-
-# =========================================================
-# IMAGE
-# =========================================================
-
-class Image(Widget):
-    """
-    Image display widget.
-    """
-
-    pass
-
-
-# =========================================================
-# TABLE
-# =========================================================
-
-class Table(Widget):
-    """
-    Table display widget.
-    """
-
-    pass
+    options: List[str] = None
+    widget_type: str = "dropdown"
+    default: Optional[str] = None

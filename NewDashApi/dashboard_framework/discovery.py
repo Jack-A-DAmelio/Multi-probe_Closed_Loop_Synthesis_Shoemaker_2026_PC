@@ -1,123 +1,34 @@
-"""
-Dashboard pane discovery.
-
-Author: You | Date: 2026-07-04 | Framework Version: v0.1
-
-Purpose:
---------
-Automatically discover dashboard panes contained within a
-directory.
-
-A pane is any class that inherits from the Pane base class.
-
-This allows new dashboard functionality to be added by simply
-creating a new Python file inside the panes directory.
-"""
-
-import importlib.util
-import inspect
-from pathlib import Path
-
-from .pane import Pane
+import os
+import importlib
+from dashboard_framework.pane import Pane
 
 
-# =========================================================
-# PANE DISCOVERY
-# =========================================================
-
-def discover_panes(
-    pane_directory,
-    state=None
-):
+def discover_panes(folder="panes"):
     """
-    Discover and instantiate dashboard panes.
-
-    Parameters
-    ----------
-    pane_directory : str or Path
-        Directory containing pane modules.
-
-    state : object, optional
-        Shared application state passed to every pane.
-
-    Returns
-    -------
-    list
-        List of instantiated Pane objects.
+    Automatically load all Pane subclasses from a folder.
     """
 
-    discovered_panes = []
+    panes = []
 
-    pane_directory = Path(pane_directory)
+    for file in os.listdir(folder):
 
-    if not pane_directory.exists():
-
-        print(f"Pane directory does not exist: {pane_directory}")
-
-        return discovered_panes
-
-    # ---------------------------------------------------------
-    # SEARCH FOR PYTHON FILES
-    # ---------------------------------------------------------
-
-    for python_file in sorted(pane_directory.glob("*.py")):
-
-        # Skip package initialization files.
-        if python_file.name == "__init__.py":
+        if not file.endswith(".py"):
             continue
 
-        try:
+        module_name = file[:-3]
+        module_path = f"{folder}.{module_name}"
 
-            # -------------------------------------------------
-            # IMPORT MODULE
-            # -------------------------------------------------
+        module = importlib.import_module(module_path)
 
-            spec = importlib.util.spec_from_file_location(
-                python_file.stem,
-                python_file
-            )
+        for attr_name in dir(module):
 
-            module = importlib.util.module_from_spec(spec)
+            obj = getattr(module, attr_name)
 
-            spec.loader.exec_module(module)
-
-            # -------------------------------------------------
-            # SEARCH FOR PANE CLASSES
-            # -------------------------------------------------
-
-            for _, obj in inspect.getmembers(
-                module,
-                inspect.isclass
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, Pane)
+                and obj is not Pane
             ):
+                panes.append(obj())
 
-                if not issubclass(obj, Pane):
-                    continue
-
-                if obj is Pane:
-                    continue
-
-                pane = obj(state=state)
-
-                discovered_panes.append(pane)
-
-                print(
-                    f"Loaded pane: {pane.TITLE}"
-                )
-
-        except Exception as error:
-
-            print(
-                f"Failed to load {python_file.name}"
-            )
-
-            print(error)
-
-    # ---------------------------------------------------------
-    # SORT BY DISPLAY ORDER
-    # ---------------------------------------------------------
-
-    discovered_panes.sort(
-        key=lambda pane: pane.ORDER
-    )
-
-    return discovered_panes
+    return panes

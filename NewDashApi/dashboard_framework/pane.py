@@ -1,28 +1,18 @@
 """
-Base dashboard pane object.
+Pane system (v1)
 
-Author: You | Date: 2026-07-04 | Framework Version: v0.1
+Author: You | Date: 2026-07-04
 
 Purpose:
 --------
-Defines the base class used for every dashboard pane.
+Defines a logical grouping of widgets that maps to a
+namespaced JSON payload.
 
-A Pane is responsible for describing:
-- its title
-- its display order
-- the widgets it contains
-- batch submission of all widget values
-
-A Pane does NOT know anything about:
-- Dash
-- HTML
-- component IDs
-- callback registration
-
-Those responsibilities belong to the dashboard engine.
+A Pane is a *data structure definition*, not a UI object.
 """
 
-from typing import List, Dict, Any
+from typing import Dict, Any, List
+from dashboard_framework.widgets import Widget
 
 
 # =========================================================
@@ -31,112 +21,97 @@ from typing import List, Dict, Any
 
 class Pane:
     """
-    Base class for all dashboard panes.
+    Base class for all panes.
 
-    Every pane in the dashboard should inherit from this class.
-
-    Required methods
-    ----------------
-    build()
-        Create and configure widgets for the pane.
-
-    Optional methods
-    ----------------
-    on_submit(values)
-        Called when the user presses the pane "Confirm" button.
-
-    refresh()
-        Called periodically by the dashboard engine.
+    A Pane:
+    - groups widgets
+    - defines a namespace
+    - produces structured JSON output
     """
 
-    # Display title shown above the pane
-    TITLE = "Untitled"
+    # MUST be overridden
+    NAME: str = "unnamed"
 
-    # Lower numbers appear earlier in the dashboard
-    ORDER = 100
-
-    def __init__(self, state=None):
-        """
-        Create a new dashboard pane.
-
-        Parameters
-        ----------
-        state : object, optional
-            Shared application state object.
-        """
-
-        # Shared application state
-        self.state = state
-
-        # Internal widget storage.
-        self.widgets: List = []
+    def __init__(self):
+        self.widgets: List[Widget] = []
+        # Verify that the pane has supplied all required metadata.
+        self._validate_metadata()
 
     # ---------------------------------------------------------
-    # AUTOMATIC WIDGET REGISTRATION
+    # WIDGET REGISTRATION
     # ---------------------------------------------------------
 
     def __setattr__(self, name, value):
         """
-        Automatically register widgets assigned to the pane.
+        Automatically register widgets assigned as attributes.
         """
 
-        # Always set attribute first
         object.__setattr__(self, name, value)
 
-        # Register widget if it is a Widget instance (flag-based for now)
-        if getattr(value, "_is_widget", False):
-
-            widgets = self.__dict__.get("widgets")
-
-            if widgets is not None and value not in widgets:
-                widgets.append(value)
+        if isinstance(value, Widget):
+            if value not in self.widgets:
+                self.widgets.append(value)
 
     # ---------------------------------------------------------
-    # REQUIRED METHODS
+    # BUILD INTERFACE (USER DEFINED)
     # ---------------------------------------------------------
 
     def build(self):
         """
-        Create widgets for this pane.
-        Must be implemented by subclasses.
+        Define widgets here.
+
+        Example:
+            self.temperature = NumberInput("temperature")
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement build()."
+            f"{self.__class__.__name__} must implement build()"
         )
 
     # ---------------------------------------------------------
-    # NEW: BATCH SUBMISSION MODEL
+    # PAYLOAD GENERATION
     # ---------------------------------------------------------
 
-    def on_submit(self, values: Dict[str, Any]):
+    def to_dict(self) -> Dict[str, Any]:
         """
-        Called when the user presses the pane-level Confirm button.
-
-        Parameters
-        ----------
-        values : dict
-            Dictionary of all widget values in the pane.
+        Convert pane into namespaced JSON payload.
 
         Returns
         -------
-        None
-
-        Notes
-        -----
-        This replaces all per-widget callback behavior.
-        Override this in each pane to run experiments or actions.
+        dict
+            { pane_name: { widget_label: value } }
         """
-        pass
 
+        data = {}
+
+        for w in self.widgets:
+            data[w.label] = w.default
+
+        return {self.NAME: data}
     # ---------------------------------------------------------
-    # OPTIONAL METHODS
+    # METADATA VALIDATION
     # ---------------------------------------------------------
 
-    def refresh(self):
+    def _validate_metadata(self):
         """
-        Periodic update function.
+        Verify that required pane metadata has been defined.
 
-        Override this method if the pane should periodically
-        update displayed values.
+        Raises
+        ------
+        ValueError
+            If a required class attribute has not been supplied by
+            the pane implementation.
         """
-        pass
+
+        required_fields = {
+            "NAME": self.NAME,
+            "TITLE": self.TITLE,
+            "API_ENDPOINT": self.API_ENDPOINT
+        }
+
+        for field_name, value in required_fields.items():
+
+            if value is None:
+
+                raise ValueError(
+                    f"{self.__class__.__name__} must define {field_name}."
+                )
