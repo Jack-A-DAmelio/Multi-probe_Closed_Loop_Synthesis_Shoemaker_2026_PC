@@ -1,3 +1,7 @@
+from dashboard_framework.pane import Pane
+from dashboard_framework.widgets import NumberInput, Dropdown
+
+
 class HeaterPane(Pane):
 
     NAME = "heater"

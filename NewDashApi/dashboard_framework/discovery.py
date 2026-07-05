@@ -1,14 +1,20 @@
 import os
 import importlib
+
 from dashboard_framework.pane import Pane
 
 
 def discover_panes(folder="panes"):
     """
-    Automatically load all Pane subclasses from a folder.
+    Automatically discover all Pane subclasses.
+
+    Returns
+    -------
+    list[type]
+        List of Pane classes.
     """
 
-    panes = []
+    pane_classes = []
 
     for file in os.listdir(folder):
 
@@ -29,6 +35,7 @@ def discover_panes(folder="panes"):
                 and issubclass(obj, Pane)
                 and obj is not Pane
             ):
-                panes.append(obj())
 
-    return panes
+                pane_classes.append(obj)
+
+    return pane_classes
