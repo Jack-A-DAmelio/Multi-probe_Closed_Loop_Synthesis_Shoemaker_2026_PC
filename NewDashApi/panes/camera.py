@@ -1,28 +1,28 @@
 from dashboard_framework.pane import Pane
-from dashboard_framework.widgets import NumberInput, Dropdown
+from dashboard_framework.widgets import NumberInput
 
 
 class CameraPane(Pane):
 
     NAME = "camera"
 
-    TITLE = "Camera"
-
-    API_ENDPOINT = "/api/camera"
     def build(self):
 
-        self.exposure = NumberInput(
-            label="exposure",
-            default=100
-        )
+        self.ip = NumberInput("ip", default="192.168.0.10")
+        self.exposure = NumberInput("exposure", default=10)
 
-        self.gain = NumberInput(
-            label="gain",
-            default=1.0
-        )
+        self.widgets = [
+            self.ip,
+            self.exposure
+        ]
 
-        self.mode = Dropdown(
-            label="mode",
-            options=["normal", "high_speed"],
-            default="normal"
-        )
+        self.actions = {
+            "send": {
+                "label": "Send",
+                "endpoint": "/camera",
+                "payload": lambda: {
+                    "ip": self.ip.value,
+                    "exposure": self.exposure.value
+                }
+            }
+        }
