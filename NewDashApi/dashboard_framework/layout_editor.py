@@ -1,6 +1,5 @@
 from dash import html, dcc, Input, Output, State
 from dashboard_framework.app import app
-from dashboard_framework.layout import DashboardLayout
 
 
 class LayoutEditor:
