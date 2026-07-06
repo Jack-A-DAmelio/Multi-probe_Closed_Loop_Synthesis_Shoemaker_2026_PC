@@ -1,4 +1,6 @@
 from dash import html
+import requests
+
 from dashboard_framework.action_engine import ActionEngine
 
 
@@ -12,10 +14,47 @@ class DashAdapter:
         for p in self.panes:
             p.build()
 
-        # ACTION ENGINE (NEW)
         self.actions = ActionEngine(self.panes)
 
+        # cache prevents flicker
+        self._cache = {}
+        self._init_cache()
+
+    def _init_cache(self):
+        for p in self.panes:
+            for w in p.widgets:
+                self._cache[(p.NAME, w.label)] = w.default
+
+    def _refresh(self):
+        for p in self.panes:
+            for w in p.widgets:
+
+                if getattr(w, "source", None):
+
+                    try:
+                        params = {
+                            "pane": p.NAME,
+                            "widget": w.label
+                        }
+
+                        if getattr(w, "params", None):
+                            params.update(w.params)
+
+                        resp = requests.get(
+                            w.source,
+                            params=params,
+                            timeout=2
+                        )
+
+                        if resp.status_code == 200:
+                            self._cache[(p.NAME, w.label)] = resp.json()
+
+                    except Exception:
+                        pass
+
     def layout(self):
+
+        self._refresh()
 
         children = []
 
@@ -32,16 +71,17 @@ class DashAdapter:
                 )
             ]
 
-            # existing widgets
             for w in p.widgets:
+
+                value = self._cache.get((p.NAME, w.label), w.default)
+
                 controls.append(
                     html.Div([
                         html.Div(w.label),
-                        html.Div(str(w.default))
+                        html.Div(str(value))
                     ])
                 )
 
-            # NEW: actions injected here
             controls += self.actions.render_actions(p)
 
             children.append(
