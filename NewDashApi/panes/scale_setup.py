@@ -1,10 +1,10 @@
 from dashboard_framework.pane import Pane
 from dashboard_framework.widgets import NumberInput
 
-class HeaterPane(Pane):
+class scale_setup(Pane):
 
     NAME = "heater"
-
+    pin_directory = {}
     def build(self):
 
         self.temperature = NumberInput(
