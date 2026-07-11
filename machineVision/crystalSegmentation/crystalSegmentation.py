@@ -1,1 +1,0 @@
-#Script which segements solution pictures to crystal area

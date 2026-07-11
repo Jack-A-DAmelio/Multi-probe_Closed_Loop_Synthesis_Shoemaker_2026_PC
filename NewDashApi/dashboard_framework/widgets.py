@@ -1,36 +1,107 @@
-from dataclasses import dataclass
-from typing import Any, List, Optional
+from dataclasses import dataclass, field  # Import dataclass helpers.
+from typing import Any, List, Optional  # Import type hints.
 
 
 @dataclass
 class Widget:
-    label: str
-    default: Any = None
-    widget_type: str = "text"
+    """
+    Base class for all widgets.
 
-    # NEW: live endpoint
-    source: Optional[str] = None
+    Contains only properties common to every widget.
+    """
 
-    # NEW: request parameters
-    params: Optional[dict] = None
+    label: str  # Human-readable name shown in the dashboard.
 
-    _is_widget: bool = True
+    widget_type: str = "widget"  # Identifier used by DashAdapter for rendering.
+
+    default: Any = None  # Initial value if a widget requires one.
+
+    _is_widget: bool = True  # Marker used to identify widget objects.
+
+
+#
+# Display widgets
+#
 
 
 @dataclass
-class NumberInput(Widget):
-    widget_type: str = "number"
-    default: float = 0.0
+class Display(Widget):
+    """
+    Read-only value display.
+
+    Can optionally refresh from a server source.
+    """
+
+    source: Optional[str] = None  # API endpoint used to retrieve live values.
+
+    params: Optional[dict] = None  # Optional request parameters for the source.
+
+    widget_type: str = "display"  # Renderer type for DashAdapter.
+
+
+#
+# User input widgets
+#
 
 
 @dataclass
 class TextInput(Widget):
-    widget_type: str = "text"
-    default: str = ""
+    """
+    User editable text field.
+    """
+
+    default: str = ""  # Starting text value.
+
+    widget_type: str = "text"  # Renderer type for DashAdapter.
+
+
+@dataclass
+class NumberInput(Widget):
+    """
+    User editable numeric field.
+    """
+
+    default: float = 0.0  # Starting numeric value.
+
+    widget_type: str = "number"  # Renderer type for DashAdapter.
 
 
 @dataclass
 class Dropdown(Widget):
-    options: List[str] = None
-    widget_type: str = "dropdown"
-    default: Optional[str] = None
+    """
+    User selectable list.
+    """
+
+    options: Optional[List[str]] = None
+    default: Optional[str] = None  # Initial selected value.
+
+    widget_type: str = "dropdown"  # Renderer type for DashAdapter.
+
+
+@dataclass
+class Checkbox(Widget):
+    """
+    User boolean input.
+    """
+
+    default: bool = False  # Initial checked state.
+
+    widget_type: str = "checkbox"  # Renderer type for DashAdapter.
+
+
+#
+# Action widgets
+#
+
+
+@dataclass
+class Button(Widget):
+    """
+    User action trigger.
+
+    Sends pane input values to a server.
+    """
+
+    endpoint: str = ""  # Server endpoint called by the button.
+
+    widget_type: str = "button"  # Renderer type for DashAdapter.
