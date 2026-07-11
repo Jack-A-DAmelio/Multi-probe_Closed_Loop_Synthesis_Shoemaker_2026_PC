@@ -30,7 +30,30 @@ CONFIG = {
 }
 
 
+global_value = 0
 
+
+@app.post("/number")
+def receive_number(data: dict):
+    print("oooo")
+    global global_value
+
+    submitted_value = data["Input Number"]
+
+    global_value = submitted_value + 1
+
+    return {
+        "status": "ok",
+        "result": global_value
+    }
+
+
+@app.get("/number/result")
+def get_result():
+    print("new ", global_value)
+    return {
+        "Server Value": global_value
+    }
 
 # =========================================================
 # API USER REQUESTS

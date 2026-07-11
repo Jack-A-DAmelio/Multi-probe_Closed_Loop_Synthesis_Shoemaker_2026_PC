@@ -1,1 +1,0 @@
-#Script which will do a status + calibration check for all onboard elements

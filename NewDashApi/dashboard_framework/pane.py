@@ -16,7 +16,7 @@ class Pane:
 
     def __init__(self):
         self.widgets: List[Widget] = []
-        self.actions = {}
+
 
     # ---------------------------------------------------------
     # WIDGET REGISTRATION

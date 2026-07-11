@@ -1,53 +1,29 @@
-from dash import html, dcc, Input, Output
-
+from dash import html, dcc, Input, Output, State
 
 from dashboard_framework.dash_adapter import DashAdapter
+from dashboard_framework.pane import Pane
 from app import app
 
 import os
 import importlib
 
-from dashboard_framework.pane import Pane
-
 
 def discover_panes(folder="panes"):
-    """
-    Automatically discover all Pane subclasses.
-
-    Returns
-    -------
-    list[type]
-        List of Pane classes.
-    """
-
     pane_classes = []
 
     for file in os.listdir(folder):
-
         if not file.endswith(".py"):
             continue
 
-        module_name = file[:-3]
-        module_path = f"{folder}.{module_name}"
+        module = importlib.import_module(f"{folder}.{file[:-3]}")
 
-        module = importlib.import_module(module_path)
+        for name in dir(module):
+            obj = getattr(module, name)
 
-        for attr_name in dir(module):
-
-            obj = getattr(module, attr_name)
-
-            if (
-                isinstance(obj, type)
-                and issubclass(obj, Pane)
-                and obj is not Pane
-            ):
-
+            if isinstance(obj, type) and issubclass(obj, Pane) and obj is not Pane:
                 pane_classes.append(obj)
 
     return pane_classes
-from dash import html, dcc, Input, Output, State
-from app import app
-
 
 
 class LayoutEditor:
@@ -57,14 +33,12 @@ class LayoutEditor:
         self._register()
 
     def layout(self):
-
         return html.Div([
-
             html.H3("Builder"),
 
             dcc.Input(
                 id="api-url",
-                value="http://localhost:5000/api"
+                value="http://localhost:8000"
             ),
 
             dcc.RadioItems(
@@ -79,12 +53,18 @@ class LayoutEditor:
                     {"label": p.__name__, "value": p.__name__}
                     for p in self.available_panes
                 ],
-                value=[p.__name__ for p in self.available_panes]
+                value=[
+                    p.__name__
+                    for p in self.available_panes
+                ]
             ),
 
-            html.Button("Update Dashboard", id="build"),
-
+            html.Button(
+                "Update Dashboard",
+                id="build"
+            )
         ])
+
 
     def _register(self):
 
@@ -106,8 +86,13 @@ class LayoutEditor:
             return {
                 "api": api,
                 "columns": cols,
-                "panes": [p.__name__ for p in chosen]
+                "panes": [
+                    p.__name__
+                    for p in chosen
+                ]
             }
+
+
 
 def main():
 
@@ -115,35 +100,57 @@ def main():
 
     builder = LayoutEditor(panes)
 
-    @app.callback(
-        Output("dashboard-area", "children"),
-        Input("layout-store", "data")
+    adapter = DashAdapter(
+        panes,
+        columns=2
     )
-    def render_dashboard(data):
 
-        if not data:
-            return "No dashboard yet"
-
-        selected = [
-            p for p in panes
-            if p.__name__ in data["panes"]
-        ]
-
-        return DashAdapter(selected, columns=data["columns"]).layout()
 
     app.layout = html.Div([
 
-        dcc.Store(id="layout-store"),
+        dcc.Store(
+            id="layout-store"
+        ),
+
+        dcc.Interval(
+            id="refresh-timer",
+            interval=1000,
+            n_intervals=0
+        ),
 
         builder.layout(),
 
         html.Hr(),
 
-        html.Div(id="dashboard-area")
+        html.Div(
+            id="dashboard-area"
+        )
 
     ])
 
-    app.run(debug=True)
+
+    @app.callback(
+        Output("dashboard-area", "children"),
+        Input("build", "n_clicks"),
+        Input("refresh-timer", "n_intervals"),
+        State("layout-store", "data")
+    )
+    def render_dashboard(build_clicks, refresh_count, data):
+
+        if not data:
+            return "No dashboard yet"
+
+        adapter.columns = data["columns"]
+
+        print("RENDER", refresh_count)
+        print("LAYOUT DATA:", data)
+
+        return adapter.layout()
+
+
+    app.run(
+        debug=True
+    )
 
 
 if __name__ == "__main__":
