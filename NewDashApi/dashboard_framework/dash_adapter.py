@@ -1,68 +1,235 @@
-from dash import html
-import requests
+from dash import html, dcc, Input, Output, State  # Dash UI components and callback tools.
+import requests  # Used for polling display widget sources.
 
+from app import app  # Your Dash application instance.
+from dashboard_framework.api import submit  # Used for sending button actions.
 
-from dash import html, Input, Output, State
-from app import app
-from dashboard_framework.api import submit
 
 class DashAdapter:
 
     def __init__(self, pane_classes, columns=2):
+        # Store pane classes that should be created.
         self.pane_classes = pane_classes
+
+        # Number of dashboard columns.
         self.columns = columns
 
+        # Create pane instances.
         self.panes = [p() for p in pane_classes]
+
+        # Build each pane's widgets.
         for p in self.panes:
             p.build()
 
-        self.actions = ActionEngine(self.panes)
-
-        # cache prevents flicker
+        # Cache stores display values and initial widget values.
         self._cache = {}
+
+        # Initialize widget values.
         self._init_cache()
 
+        # Register callbacks for buttons.
+        self._register_buttons()
+
+
     def _init_cache(self):
+        # Loop through every pane.
         for p in self.panes:
+
+            # Loop through every widget in the pane.
             for w in p.widgets:
+
+                # Store initial widget value.
                 self._cache[(p.NAME, w.label)] = w.default
 
+
     def _refresh(self):
+        # Update display widgets from their sources.
         for p in self.panes:
+
+            # Check every widget.
             for w in p.widgets:
 
+                # Only widgets with a source should refresh.
                 if getattr(w, "source", None):
 
                     try:
+                        # Default query parameters.
                         params = {
                             "pane": p.NAME,
                             "widget": w.label
                         }
 
+                        # Add user supplied parameters.
                         if getattr(w, "params", None):
                             params.update(w.params)
 
+                        # Request latest value.
                         resp = requests.get(
                             w.source,
                             params=params,
                             timeout=2
                         )
 
+                        # Save successful response.
                         if resp.status_code == 200:
                             self._cache[(p.NAME, w.label)] = resp.json()
 
                     except Exception:
+                        # Ignore failed refreshes.
                         pass
+
+
+    def _widget_id(self, pane, widget):
+        # Create a unique Dash ID for widgets.
+        return f"{pane.NAME}:{widget.label}"
+
+
+    def _render_widget(self, pane, widget):
+        # Generate unique ID.
+        widget_id = self._widget_id(pane, widget)
+
+        # Retrieve current value.
+        value = self._cache.get(
+            (pane.NAME, widget.label),
+            widget.default
+        )
+
+        #
+        # Read-only display widget.
+        #
+        if widget.widget_type == "display":
+
+            return html.Div([
+                html.Div(
+                    widget.label
+                ),
+
+                html.Div(
+                    str(value),
+                    style={
+                        "backgroundColor": "#f2f2f2",  # Light grey background for live values.
+                        "padding": "6px",              # Adds spacing around the displayed value.
+                        "borderRadius": "4px"           # Slightly rounds the display box corners.
+                    }
+                )
+            ])
+
+
+        #
+        # User text entry.
+        #
+        elif widget.widget_type == "text":
+
+            return html.Div([
+                html.Div(widget.label),
+
+                dcc.Input(
+                    id=widget_id,
+                    value=value,
+                    type="text"
+                )
+            ])
+
+
+        #
+        # User numeric entry.
+        #
+        elif widget.widget_type == "number":
+
+            return html.Div([
+                html.Div(widget.label),
+
+                dcc.Input(
+                    id=widget_id,
+                    value=value,
+                    type="number"
+                )
+            ])
+
+
+        #
+        # Dropdown selection.
+        #
+        elif widget.widget_type == "dropdown":
+
+            return html.Div([
+                html.Div(widget.label),
+
+                dcc.Dropdown(
+                    id=widget_id,
+                    options=[
+                        {
+                            "label": option,
+                            "value": option
+                        }
+                        for option in widget.options
+                    ],
+                    value=value
+                )
+            ])
+
+
+        #
+        # Checkbox input.
+        #
+        elif widget.widget_type == "checkbox":
+
+            return html.Div([
+                dcc.Checklist(
+                    id=widget_id,
+                    options=[
+                        {
+                            "label": widget.label,
+                            "value": True
+                        }
+                    ],
+                    value=[True] if value else []
+                )
+            ])
+
+
+        #
+        # Button action.
+        #
+        elif widget.widget_type == "button":
+
+            return html.Div([
+
+                html.Button(
+                    widget.label,
+                    id=widget_id
+                ),
+
+                html.Div(
+                    id=f"{widget_id}:status"
+                )
+            ])
+
+
+        #
+        # Unknown widget fallback.
+        #
+        else:
+
+            return html.Div([
+                html.Div(widget.label),
+                html.Div(str(value))
+            ])
+
 
     def layout(self):
 
+        # Refresh live displays.
         self._refresh()
 
+        # Store pane cards.
         children = []
 
+        # Build every pane.
         for p in self.panes:
 
             controls = [
+
                 html.Div(
                     p.NAME,
                     style={
@@ -73,22 +240,21 @@ class DashAdapter:
                 )
             ]
 
+            # Render every widget.
             for w in p.widgets:
 
-                value = self._cache.get((p.NAME, w.label), w.default)
-
                 controls.append(
-                    html.Div([
-                        html.Div(w.label),
-                        html.Div(str(value))
-                    ])
+                    self._render_widget(
+                        p,
+                        w
+                    )
                 )
 
-            controls += self.actions.render_actions(p)
-
             children.append(
+
                 html.Div(
                     controls,
+
                     style={
                         "border": "1px solid #ddd",
                         "padding": "14px",
@@ -98,8 +264,10 @@ class DashAdapter:
                 )
             )
 
+
         return html.Div(
             children,
+
             style={
                 "display": "grid",
                 "gridTemplateColumns": f"repeat({self.columns}, 1fr)",
@@ -109,76 +277,73 @@ class DashAdapter:
         )
 
 
+    def _register_buttons(self):
 
-
-class ActionEngine:
-    """
-    Turns pane.action declarations into Dash UI + callbacks.
-    """
-
-    def __init__(self, panes):
-        self.panes = panes
-        self._register_actions()
-
-    def render_actions(self, pane):
-
-        if not hasattr(pane, "actions"):
-            return []
-
-        ui = []
-
-        for action_name, action in pane.actions.items():
-
-            button_id = f"{pane.NAME}:{action_name}"
-            status_id = f"{pane.NAME}:{action_name}:status"
-
-            ui.append(
-                html.Button(
-                    action.get("label", action_name),
-                    id=button_id
-                )
-            )
-
-            ui.append(
-                html.Div(id=status_id)
-            )
-
-        return ui
-
-    def _register_actions(self):
-
+        # Register callback for every button widget.
         for pane in self.panes:
 
-            if not hasattr(pane, "actions"):
-                continue
+            for widget in pane.widgets:
 
-            for action_name, action in pane.actions.items():
+                # Only buttons create callbacks.
+                if widget.widget_type != "button":
+                    continue
 
-                button_id = f"{pane.NAME}:{action_name}"
-                status_id = f"{pane.NAME}:{action_name}:status"
+
+                button_id = self._widget_id(
+                    pane,
+                    widget
+                )
+
+                status_id = f"{button_id}:status"
+
 
                 @app.callback(
-                    Output(status_id, "children"),
-                    Input(button_id, "n_clicks"),
-                    State("layout-store", "data"),
+                    Output(
+                        status_id,
+                        "children"
+                    ),
+
+                    Input(
+                        button_id,
+                        "n_clicks"
+                    ),
+
+                    State(
+                        "layout-store",
+                        "data"
+                    ),
+
                     prevent_initial_call=True
                 )
-                def run_action(n, layout, action=action):
+                def run_button(
+                    n,
+                    layout,
+                    widget=widget,
+                    pane=pane
+                ):
 
+                    # Ensure layout exists.
                     if not layout:
                         return "No layout"
 
+
+                    # Get API base URL.
                     api_url = layout["api"]
 
-                    payload_fn = action["payload"]
-                    endpoint = action["endpoint"]
 
-                    payload = payload_fn()
+                    # Get pane input values.
+                    payload = layout.get(
+                        pane.NAME,
+                        {}
+                    )
 
+
+                    # Send request.
                     ok = submit(
                         api_url,
-                        endpoint,
+                        widget.endpoint,
                         payload
                     )
+
 
                     return "OK" if ok else "FAILED"

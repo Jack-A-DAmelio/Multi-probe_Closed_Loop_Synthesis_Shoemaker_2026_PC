@@ -37,7 +37,19 @@ class Display(Widget):
     params: Optional[dict] = None  # Optional request parameters for the source.
 
     widget_type: str = "display"  # Renderer type for DashAdapter.
+@dataclass
+class ImageDisplay(Widget):
+    """
+    Read-only image display.
 
+    Retrieves an image from a server source.
+    """
+
+    source: Optional[str] = None  # URL used to retrieve the image.
+
+    params: Optional[dict] = None  # Optional request parameters.
+
+    widget_type: str = "image"  # Tells DashAdapter to render an image.
 
 #
 # User input widgets
