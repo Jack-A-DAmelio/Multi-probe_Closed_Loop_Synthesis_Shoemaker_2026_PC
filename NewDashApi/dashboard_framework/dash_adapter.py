@@ -3,7 +3,8 @@ import requests  # Used for polling display widget sources.
 
 from app import app  # Your Dash application instance.
 from dashboard_framework.api import submit  # Used for sending button actions.
-
+import threading
+import time
 
 class DashAdapter:
 
@@ -18,11 +19,18 @@ class DashAdapter:
         # Base API address for this dashboard instance.
         self.api_url = api_url or ""
 
-        # Create pane instances.
-        self.panes = [p() for p in pane_classes]
+       # Create all available pane instances.
+        self.all_panes = [p() for p in pane_classes]
+
+        # Initially all panes are inactive
+        self.active_panes = []
+
+        self._lock = threading.Lock()
+        self._polling = False
+        self._poll_thread = None
 
         # Build each pane's widgets.
-        for p in self.panes:
+        for p in self.all_panes:
             p.build()
 
         # Cache stores display values and initial widget values.
@@ -36,12 +44,26 @@ class DashAdapter:
 
         # Register callbacks for buttons.
         self._register_buttons()
+        self._register_display_updates()
 
+    def set_active_panes(self, pane_names):
+        """
+        Select which panes should be rendered and refreshed.
 
+        Parameters
+        ----------
+        pane_names : list[str]
+            Pane class names selected by the layout editor.
+        """
+
+        self.active_panes = [
+            p for p in self.all_panes
+            if p.__class__.__name__ in pane_names
+        ]
     def _init_cache(self):
 
         # Loop through every pane.
-        for p in self.panes:
+        for p in self.all_panes:
 
             # Loop through every widget.
             for w in p.widgets:
@@ -67,9 +89,10 @@ class DashAdapter:
 
 
     def _refresh(self):
-
+        import time
+        start = time.time()
         # Update display widgets from their sources.
-        for p in self.panes:
+        for p in self.active_panes:
 
             # Check every widget.
             for w in p.widgets:
@@ -93,28 +116,34 @@ class DashAdapter:
                         # Add optional parameters.
                         if getattr(w, "params", None):
                             params.update(w.params)
-
+                        print("GETTING LIVE DATA:", url)
                         # Request latest value.
                         response = requests.get(
                             url,
                             params=params,
                             timeout=2
                         )
-
+                        print("LIVE RESPONSE:", response.status_code, response.text)
                         # Store successful response.
                         if response.status_code == 200:
 
-                            self._cache[
-                                (p.NAME, w.label)
-                            ] = response.json()
+                            with self._lock:
+
+                                self._cache[
+                                    (p.NAME, w.label)
+                                ] = response.json()
 
 
-                    except Exception:
-
+                    except Exception as e:
+                        print("REFRESH FAILED:", repr(e))
                         # Ignore failed refreshes.
                         pass
 
-
+        print(
+        "REFRESH TIME:",
+        round(time.time() - start, 3),
+        "seconds"
+          )
 
     def _widget_id(self, pane, widget):
 
@@ -310,14 +339,14 @@ class DashAdapter:
     def layout(self):
 
         # Refresh live displays.
-        self._refresh()
+        #self._refresh()
 
         # Store pane cards.
         children = []
 
 
         # Build panes.
-        for p in self.panes:
+        for p in self.active_panes:
 
             controls = [
 
@@ -380,7 +409,7 @@ class DashAdapter:
         Store user input values into layout-store.
         """
 
-        for pane in self.panes:
+        for pane in self.all_panes:
 
             for widget in pane.widgets:
 
@@ -403,7 +432,7 @@ class DashAdapter:
                 @app.callback(
 
                     Output(
-                        "layout-store",
+                        "input-store",
                         "data",
                         allow_duplicate=True
                     ),
@@ -414,7 +443,7 @@ class DashAdapter:
                     ),
 
                     State(
-                        "layout-store",
+                        "input-store",
                         "data"
                     ),
 
@@ -455,7 +484,7 @@ class DashAdapter:
         Register callbacks for buttons.
         """
 
-        for pane in self.panes:
+        for pane in self.all_panes:
 
             for widget in pane.widgets:
 
@@ -486,26 +515,30 @@ class DashAdapter:
                     ),
 
                     State(
-                        "layout-store",
+                        "input-store",
                         "data"
                     ),
-
+                    State(
+                        "layout-store",
+                        "data"
+                      ),
                     prevent_initial_call=True
 
                 )
                 def run_button(
-                    n,
-                    layout,
-                    widget=widget,
-                    pane=pane
+                n,
+                inputs,
+                layout,
+                widget=widget,
+                pane=pane
                 ):
 
 
                     if not layout:
-                        return "No layout"
+                        return "No input data"
 
 
-                    payload = layout.get(
+                    payload = inputs.get(
                         pane.NAME,
                         {}
                     )
@@ -526,3 +559,74 @@ class DashAdapter:
 
 
                     return "OK" if ok else "FAILED"
+
+    def _register_display_updates(self):
+        """
+        Update live display widgets from the adapter cache.
+        """
+
+        for pane in self.all_panes:
+
+            for widget in pane.widgets:
+
+                if widget.widget_type != "display":
+                    continue
+
+                display_id = f"{self._widget_id(pane, widget)}:value"
+
+                @app.callback(
+                    Output(
+                        display_id,
+                        "children"
+                    ),
+                    Input(
+                        "refresh-timer",
+                        "n_intervals"
+                    )
+                )
+                def update_display(
+                    n,
+                    pane=pane,
+                    widget=widget
+                ):
+
+                    with self._lock:
+
+                        value = self._cache.get(
+                            (pane.NAME, widget.label),
+                            widget.default
+                        )
+
+                    return str(value)
+    def _poll_loop(self):
+
+        while self._polling:
+
+            try:
+                self._refresh()
+
+            except Exception as e:
+                print(
+                    "BACKGROUND REFRESH FAILED:",
+                    repr(e)
+                )
+
+            time.sleep(1)
+    def start_polling(self):
+
+        if self._polling:
+            return
+
+        self._polling = True
+
+        self._poll_thread = threading.Thread(
+            target=self._poll_loop,
+            daemon=True
+        )
+
+        self._poll_thread.start()
+
+
+    def stop_polling(self):
+
+        self._polling = False

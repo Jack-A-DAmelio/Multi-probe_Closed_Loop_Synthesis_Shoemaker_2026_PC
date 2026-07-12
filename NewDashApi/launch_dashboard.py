@@ -20,7 +20,11 @@ def discover_panes(folder="panes"):
         for name in dir(module):
             obj = getattr(module, name)
 
-            if isinstance(obj, type) and issubclass(obj, Pane) and obj is not Pane:
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, Pane)
+                and obj is not Pane
+            ):
                 pane_classes.append(obj)
 
     return pane_classes
@@ -33,7 +37,9 @@ class LayoutEditor:
         self._register()
 
     def layout(self):
+
         return html.Div([
+
             html.H3("Builder"),
 
             dcc.Input(
@@ -50,19 +56,20 @@ class LayoutEditor:
             dcc.Checklist(
                 id="pane-selector",
                 options=[
-                    {"label": p.__name__, "value": p.__name__}
+                    {
+                        "label": p.__name__,
+                        "value": p.__name__
+                    }
                     for p in self.available_panes
                 ],
-                value=[
-                    p.__name__
-                    for p in self.available_panes
-                ]
+                value=[]
             ),
 
             html.Button(
                 "Update Dashboard",
                 id="build"
             )
+
         ])
 
 
@@ -104,13 +111,16 @@ def main():
         panes,
         columns=2
     )
-
+    adapter.start_polling()
 
     app.layout = html.Div([
 
         dcc.Store(
             id="layout-store"
+            
         ),
+        
+        dcc.Store(id="input-store"),
 
         dcc.Interval(
             id="refresh-timer",
@@ -129,23 +139,39 @@ def main():
     ])
 
 
+    #
+    # Build dashboard only when requested.
+    #
     @app.callback(
-        Output("dashboard-area", "children"),
-        Input("build", "n_clicks"),
-        Input("refresh-timer", "n_intervals"),
-        State("layout-store", "data")
+        Output(
+            "dashboard-area",
+            "children"
+        ),
+        Input(
+            "layout-store",
+            "data"
+        ),
+        prevent_initial_call=True
     )
-    def render_dashboard(build_clicks, refresh_count, data):
-
+    def render_dashboard(data):
+        print("### RENDER DASHBOARD FIRED ###")
         if not data:
             return "No dashboard yet"
 
         adapter.columns = data["columns"]
+        adapter.api_url = data["api"]
+        print("Selected panes:", data["panes"])
+        adapter.set_active_panes(data["panes"])
+        print("Active panes:", [p.__class__.__name__ for p in adapter.active_panes])
 
-        print("RENDER", refresh_count)
+        print("BUILD DASHBOARD")
         print("LAYOUT DATA:", data)
 
         return adapter.layout()
+
+
+
+    
 
 
     app.run(
@@ -155,3 +181,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    
