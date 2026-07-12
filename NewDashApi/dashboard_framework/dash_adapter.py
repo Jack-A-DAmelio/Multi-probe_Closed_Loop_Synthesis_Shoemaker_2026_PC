@@ -139,12 +139,7 @@ class DashAdapter:
                         # Ignore failed refreshes.
                         pass
 
-        print(
-        "REFRESH TIME:",
-        round(time.time() - start, 3),
-        "seconds"
-          )
-
+       
     def _widget_id(self, pane, widget):
 
         # Create unique Dash ID.

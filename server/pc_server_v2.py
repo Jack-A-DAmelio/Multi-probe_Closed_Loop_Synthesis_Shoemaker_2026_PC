@@ -14,10 +14,24 @@ from typing import List, Dict, Any
 import pc_state
 
 
+
+from endpoints import example_end_points
+from endpoints import data_retrieval_end_points
+from endpoints import control_end_points
+
+
+
 PC_STATE = pc_state.PCState()  # Singleton instance of the PCState class, which holds all runtime state for the server. This object is shared across FastAPI endpoints and must be thread-safe.
 
 
-app = FastAPI()# Initialize FastAPI application instance. This is the server that will handle incoming HTTP requests from the Pi and dashboard clients.
+
+app = FastAPI()
+
+
+app.include_router(example_end_points.router)
+app.include_router(data_retrieval_end_points.router)
+app.include_router(control_end_points.router)
+
 
 
 # =========================================================
@@ -30,87 +44,12 @@ CONFIG = {
 }
 
 
-global_value = 0
-
-
-@app.post("/number")
-def receive_number(data: dict):
-    print("oooo")
-    global global_value
-
-    submitted_value = data["Input Number"]
-
-    global_value = submitted_value + 1
-
-    return {
-        "status": "ok",
-        "result": global_value
-    }
-
-
-@app.get("/number/result")
-def get_result():
-    print("new ", global_value)
-    return {
-        "Server Value": global_value
-    }
-
-# =========================================================
-# API USER REQUESTS
-# =========================================================
-
-@app.get("/get_data")
-def get_data(module_name: str):
-    """
-    Retrieve the latest data for a specific module.
-    """
-    return PC_STATE.get_latest_data(module_name)
-# =========================================================
-# API USER SUBMISSIONS
-# =========================================================
-
-#confiuring experiment parameters
-@app.post("/add_module_to_pc_state")
-def add_module_to_pc_state(data: dict):
-    """
-    Add a new module to the PC state with its corresponding pin directory.
-    """
-    PC_STATE.add_module(data["module_name"], data["pin_directory"])
-    return {"status": "success", "message": f"Module {data['module_name']} added with pin directory {data['pin_directory']}"}
-
-@app.post("/load_state_to_pi")
-def load_state_to_pi():
-    """
-    Send the current PC state to the Pi for synchronization.
-    """
-    PC_STATE.send_state_to_pi()
-    return
 
 
 
-@app.post("/test_measurement")
-def test_measurement():
-    """
-    
-    """
-    PC_STATE.measure()
-    return 
 
-# Control loop
-@app.post("/start_experiment")
-def start_experiment():
-    """
-    
-    """
-    PC_STATE.start_experiment()
-    return 
-@app.post("/stop_experiment")
-def stop_experiment():
-    """
-    
-    """
-    PC_STATE.stop_experiment()
-    return
+
+
 # =========================================================
 # ENTRY POINT
 # =========================================================
