@@ -155,55 +155,59 @@ class PCState:
         self._experiment_thread.start()
 
 
+def _experiment_loop(self):
 
-    def _experiment_loop(self):
+    filename = (
+        Path(self.output_file_path)
+        /
+        f"experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    )
 
 
-        filename = (
-            Path(self.output_file_path)
-            /
-            f"experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    with open(
+        filename,
+        "w",
+        newline=""
+    ) as file:
+
+
+        writer = csv.writer(file)
+
+
+        writer.writerow(
+            [
+                "measurement_name",
+                "measure",
+                "timestamp"
+            ]
         )
 
 
-        with open(
-            filename,
-            "w",
-            newline=""
-        ) as file:
+        while self.experiment_running:
+
+            try:
+
+                # Request one synchronized measurement cycle from Pi
+                data = self.measure()
 
 
-            writer = csv.writer(file)
+                timestamp = data.get(
+                    "timestamp",
+                    time.time()
+                )
 
 
-            writer.writerow(
-                [
-                    "measurement_name",
-                    "measure",
-                    "timestamp"
-                ]
-            )
+                measurements = data.get(
+                    "measurements",
+                    {}
+                )
 
 
-            while self.experiment_running:
-
-                try:
-
-                    data = self.measure()
+                # Loop through all hardware results
+                for measurement_name, value in measurements.items():
 
 
-                    measurement_name = (
-                        data["measurement_name"]
-                    )
-
-                    value = data["measure"]
-
-                    timestamp = (
-                        data["timestamp"]
-                    )
-
-
-                    # Update live state
+                    # Update live dashboard state
                     with self._lock:
 
                         if measurement_name in self.modules:
@@ -215,7 +219,7 @@ class PCState:
                             ] = value
 
 
-                    # Save data
+                    # Save measurement
                     writer.writerow(
                         [
                             measurement_name,
@@ -225,21 +229,20 @@ class PCState:
                     )
 
 
-                    file.flush()
+                file.flush()
 
 
-                except Exception as e:
+            except Exception as e:
 
-                    print(
-                        "EXPERIMENT LOOP ERROR:",
-                        repr(e)
-                    )
-
-
-                time.sleep(
-                    self.refresh_rate
+                print(
+                    "EXPERIMENT LOOP ERROR:",
+                    repr(e)
                 )
 
+
+            time.sleep(
+                self.refresh_rate
+            )
 
 
     def stop_experiment(self):
