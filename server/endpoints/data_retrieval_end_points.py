@@ -4,6 +4,12 @@ from pc_state import PC_STATE
 
 router = APIRouter()
 
+from fastapi import APIRouter
+from fastapi.responses import FileResponse
+from pc_state import PC_STATE
+
+router = APIRouter()
+
 
 @router.get("/api/get_data")
 def get_data(pane: str, widget: str):
@@ -11,8 +17,6 @@ def get_data(pane: str, widget: str):
     # ===============================
     # Camera
     # ===============================
-
-
 
     if pane == "camera_setup":
 
@@ -32,10 +36,6 @@ def get_data(pane: str, widget: str):
                 image_path,
                 media_type="image/jpeg"
             )
-
-    return {
-        "error": "Unknown pane/widget"
-    }
 
 
     # ===============================
@@ -93,7 +93,6 @@ def get_data(pane: str, widget: str):
     return {
         "error": f"Unknown pane/widget: {pane}/{widget}"
     }
-
 
 @router.get("/api/experiment/config")
 def get_experiment_config():

@@ -1,77 +1,54 @@
 """
 PC shared state object.
-
-Author: You | Date: 2026-06-18 | Hardware Version: v0.1
-
-Purpose:
---------
-Holds all runtime state for PC-side experiment control and data ingestion.
-
-This includes:
-- incoming streamed data from Pi
-- experiment status
-- thread-safe data buffer for plotting
-- logging / output flags
 """
 
-import threading
 from collections import deque
+import threading
+import time
+import os
+import csv
+from datetime import datetime
+from pathlib import Path
+import requests
 
-
-# =========================================================
-# SHARED STATE OBJECT
-# =========================================================
 
 class PCState:
-    """
-    Central state container for PC server runtime.
-
-    This object is shared across FastAPI endpoints and must be thread-safe.
-    """
 
     def __init__(self):
 
-        # ---------------------------------------------------------
-        # EXPERIMENT CONTROL STATE
-        # ---------------------------------------------------------
+        # Experiment state
+        self.experiment_running = False
+        self.current_experiment_id = None
 
-        self.experiment_running = False  # True when Pi streaming is active
-        self.current_experiment_id = None  # identifier set by dashboard
+        # Data output
+        self.output_file_path = None
+        self.refresh_rate = 1.0
 
-
-        self.output_file_path = None       # active CSV file path
-        self.refresh_rate = 1.0                # data refresh rate in seconds.
+        # Hardware state
         self.modules = {}
-        self.pi_address = None  # IP address of the Pi for communication
+        self.pi_address = None
+
+        # Thread management
+        self._experiment_thread = None
+        self._lock = threading.Lock()
 
 
+    # ---------------------------------------------------------
+    # Configuration setters
+    # ---------------------------------------------------------
 
-
-    #setters for experiment parameters-----------------------------------------
     def set_file_path(self, path: str):
-        """
-        Set the output file path for data logging.
-
-        Args:
-            path (str): Path to the output CSV file.
-        """
         self.output_file_path = path
+
+
     def set_refresh_rate(self, rate: float):
-        """
-        Set the data refresh rate for the experiment.
-
-        Args:
-            rate (float): Refresh rate in seconds.
-        """
         self.refresh_rate = rate
-    def set_experiment_id(self, experiment_id: str):
-        """
-        Set the current experiment identifier.
 
-        Args:
-            experiment_id (str): Unique identifier for the experiment.
-        """
+
+    def set_experiment_id(self, experiment_id: str):
         self.current_experiment_id = experiment_id
+
+
     def add_module(self, module_name: str, pin_directory):
 
         self.modules[module_name] = {
@@ -80,36 +57,210 @@ class PCState:
         }
 
 
-    # pi interactions---------------------------------------
+    # ---------------------------------------------------------
+    # PI COMMUNICATION
+    # ---------------------------------------------------------
+
     def send_state_to_pi(self):
-        """
-        Send the current state to the Pi for synchronization.
 
-        This function should handle the communication with the Pi to update its state.
-        """
-        # Implementation for sending state to Pi goes here
-        pass
+        if self.pi_address is None:
+            raise RuntimeError("Pi address not configured")
+
+
+        payload = {
+            "modules": self.modules
+        }
+
+
+        response = requests.post(
+            f"http://{self.pi_address}/configure",
+            json=payload,
+            timeout=5
+        )
+
+
+        response.raise_for_status()
+
+        return response.json()
+
+
+
     def measure(self):
-        """
-        Trigger a measurement on the Pi.
 
-        This function should handle the communication with the Pi to initiate a measurement.
-        """
-        # Implementation for triggering measurement on Pi goes here
-        pass
+        if self.pi_address is None:
+            raise RuntimeError("Pi address not configured")
 
 
-    #control behavior of experiment loop thread-----------------------------------
+        response = requests.post(
+            f"http://{self.pi_address}/measure",
+            timeout=5
+        )
+
+
+        response.raise_for_status()
+
+        return response.json()
+
+
+
+    def cleanup(self):
+
+        if self.pi_address is None:
+            return
+
+
+        requests.post(
+            f"http://{self.pi_address}/cleanup",
+            timeout=5
+        )
+
+
+
+    # ---------------------------------------------------------
+    # EXPERIMENT LOOP
+    # ---------------------------------------------------------
+
     def start_experiment(self):
-        #sets experiment_running to True and starts the experiment loop thread
+
+        if self.experiment_running:
+            return
+
+
+        # Make sure output directory exists
+        if self.output_file_path is None:
+            raise RuntimeError(
+                "Output file path not configured"
+            )
+
+
+        Path(self.output_file_path).mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+
+        # Send hardware configuration
+        self.send_state_to_pi()
+
+
         self.experiment_running = True
-        return 0
+
+
+        self._experiment_thread = threading.Thread(
+            target=self._experiment_loop,
+            daemon=True
+        )
+
+
+        self._experiment_thread.start()
+
+
+
+    def _experiment_loop(self):
+
+
+        filename = (
+            Path(self.output_file_path)
+            /
+            f"experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+
+
+        with open(
+            filename,
+            "w",
+            newline=""
+        ) as file:
+
+
+            writer = csv.writer(file)
+
+
+            writer.writerow(
+                [
+                    "measurement_name",
+                    "measure",
+                    "timestamp"
+                ]
+            )
+
+
+            while self.experiment_running:
+
+                try:
+
+                    data = self.measure()
+
+
+                    measurement_name = (
+                        data["measurement_name"]
+                    )
+
+                    value = data["measure"]
+
+                    timestamp = (
+                        data["timestamp"]
+                    )
+
+
+                    # Update live state
+                    with self._lock:
+
+                        if measurement_name in self.modules:
+
+                            self.modules[
+                                measurement_name
+                            ][
+                                "latest_value"
+                            ] = value
+
+
+                    # Save data
+                    writer.writerow(
+                        [
+                            measurement_name,
+                            value,
+                            timestamp
+                        ]
+                    )
+
+
+                    file.flush()
+
+
+                except Exception as e:
+
+                    print(
+                        "EXPERIMENT LOOP ERROR:",
+                        repr(e)
+                    )
+
+
+                time.sleep(
+                    self.refresh_rate
+                )
+
+
 
     def stop_experiment(self):
-        #sets experiment_running to False, which should terminate the experiment loop thread
-        #send cleanup to pi
+
         self.experiment_running = False
-        return 0 
+
+
+        if self._experiment_thread:
+
+            self._experiment_thread.join(
+                timeout=5
+            )
+
+
+        self.cleanup()
+
+
+
+    # ---------------------------------------------------------
+    # Access
+    # ---------------------------------------------------------
 
     def get_latest_data(self, module_name: str):
 
@@ -118,10 +269,9 @@ class PCState:
 
         return None
 
+
+
     def __str__(self):
-        """
-        Return a human-readable summary of the current PC state.
-        """
 
         lines = [
             "========== Experiment Configuration ==========",
@@ -134,9 +284,14 @@ class PCState:
             "Modules:"
         ]
 
+
         if not self.modules:
+
             lines.append("  None")
+
+
         else:
+
             for name, module in self.modules.items():
 
                 lines.append(f"  {name}")
@@ -149,7 +304,9 @@ class PCState:
                     f"    Pin Directory: {module['pin_directory']}"
                 )
 
+
         return "\n".join(lines)
 
-PC_STATE = PCState()  # Singleton instance of the PCState class, which holds all runtime state for the server. This object is shared across FastAPI endpoints and must be thread-safe.
 
+
+PC_STATE = PCState()
