@@ -62,15 +62,27 @@ class DashAdapter:
         ]
     def _init_cache(self):
 
-        # Loop through every pane.
         for p in self.all_panes:
 
-            # Loop through every widget.
             for w in p.widgets:
 
-                # Store initial widget value.
+                # Store initial widget value
                 self._cache[(p.NAME, w.label)] = w.default
 
+                # Also initialize input-store defaults
+                if w.widget_type in [
+                    "text",
+                    "number",
+                    "dropdown",
+                    "checkbox"
+                ]:
+                    if not hasattr(self, "_input_defaults"):
+                        self._input_defaults = {}
+
+                    if p.NAME not in self._input_defaults:
+                        self._input_defaults[p.NAME] = {}
+
+                    self._input_defaults[p.NAME][w.label] = w.default
 
     def _build_url(self, path):
 
@@ -99,6 +111,11 @@ class DashAdapter:
 
                 # Only widgets with sources refresh.
                 if getattr(w, "source", None):
+
+                    # Image widgets are loaded directly by the browser.
+                    # They do not use the JSON cache.
+                    if w.widget_type == "image":
+                        continue
 
                     try:
 
@@ -129,9 +146,16 @@ class DashAdapter:
 
                             with self._lock:
 
-                                self._cache[
-                                    (p.NAME, w.label)
-                                ] = response.json()
+                                data = response.json()
+
+                                if isinstance(data, dict) and w.label in data:
+                                    self._cache[
+                                        (p.NAME, w.label)
+                                    ] = data[w.label]
+                                else:
+                                    self._cache[
+                                        (p.NAME, w.label)
+                                    ] = data
 
 
                     except Exception as e:
@@ -179,7 +203,8 @@ class DashAdapter:
                     style={
                         "backgroundColor": "#f2f2f2",
                         "padding": "6px",
-                        "borderRadius": "4px"
+                        "borderRadius": "4px",
+                        "whiteSpace": "pre-line"
                     }
                 )
 
@@ -191,6 +216,20 @@ class DashAdapter:
         #
         elif widget.widget_type == "image":
 
+            params = {
+                "pane": pane.NAME,
+                "widget": widget.label
+            }
+
+            if widget.params:
+                params.update(widget.params)
+
+            query = "&".join(
+                f"{key}={value}"
+                for key, value in params.items()
+            )
+            url = f"{self._build_url(widget.source)}?{query}"
+            print("IMAGE URL:", url)
             return html.Div([
 
                 html.Div(
@@ -198,7 +237,7 @@ class DashAdapter:
                 ),
 
                 html.Img(
-                    src=self._build_url(widget.source),
+                    src=f"{self._build_url(widget.source)}?{query}",
                     style={
                         "width": "100%",
                         "maxHeight": "300px",
@@ -209,7 +248,6 @@ class DashAdapter:
                 )
 
             ])
-
 
         #
         # Text input widget.
@@ -533,10 +571,13 @@ class DashAdapter:
                         return "No input data"
 
 
-                    payload = inputs.get(
-                        pane.NAME,
-                        {}
-                    )
+                    payload = self._input_defaults.get(
+                    pane.NAME,
+                    {}
+                    ).copy()
+
+                    if inputs and pane.NAME in inputs:
+                        payload.update(inputs[pane.NAME])
 
 
                     api_url = layout["api"]

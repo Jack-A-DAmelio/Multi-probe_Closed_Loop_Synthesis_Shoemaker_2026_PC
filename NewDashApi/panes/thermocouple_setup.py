@@ -37,12 +37,12 @@ class thermocouple_setup(Pane):
         # Send configuration to the PC server
         self.send = Button(
             label="Send to PC",
-            endpoint="/api/thermocouple/setup"
+            endpoint="/add_module_to_pc_state?module_name=thermocouple"
         )
 
 
         # Live thermocouple temperature
         self.temperature = Display(
             label="Current Temperature",
-            source="/api/thermocouple/temperature"
+            source="/api/get_data"
         )

@@ -26,25 +26,25 @@ class experiment_control(Pane):
         # Sends the selected hardware modules/configuration to the Pi.
         self.send_modules = Button(
             label="Send Modules to Pi",
-            endpoint="/api/experiment/send_modules"
+            endpoint="/load_state_to_pi"
         )
 
         # Performs a single test measurement.
         self.test_measurement = Button(
             label="Test Measurement",
-            endpoint="/api/experiment/test"
+            endpoint="/test_measurement"
         )
 
         # Starts the experiment.
         self.start = Button(
             label="Start Experiment",
-            endpoint="/api/experiment/start"
+            endpoint="/start_experiment"
         )
 
         # Stops the experiment.
         self.stop = Button(
             label="End Experiment",
-            endpoint="/api/experiment/stop"
+            endpoint="/stop_experiment"
         )
 
         # Cleans up hardware and software resources.

@@ -21,11 +21,12 @@ class camera_setup(Pane):
         # Send configuration to the PC server
         self.send = Button(
             label="Send to PC",
-            endpoint="/api/camera/setup"
+            endpoint="/add_module_to_pc_state?module_name=camera"
         )
 
         # Live camera feed
         self.camera = ImageDisplay(
             label="Camera View",
-            source="/api/camera/latest"
+            source="/api/get_data",
+            default="test_image.jpg"
         )

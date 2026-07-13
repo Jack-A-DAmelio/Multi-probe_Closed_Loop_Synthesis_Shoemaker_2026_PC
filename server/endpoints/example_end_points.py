@@ -1,10 +1,10 @@
 from fastapi import APIRouter
-from pc_server_v2 import PC_STATE
+from pc_state import PC_STATE
 router = APIRouter()
 
 global_value = 0
 
-@app.post("/number")
+@router.post("/number")
 def receive_number(data: dict):
     print("oooo")
     global global_value
@@ -19,7 +19,7 @@ def receive_number(data: dict):
     }
 
 
-@app.get("/number/result")
+@router.get("/number/result")
 def get_result():
     print("new ", global_value)
     return {

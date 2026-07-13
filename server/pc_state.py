@@ -41,8 +41,7 @@ class PCState:
 
         self.output_file_path = None       # active CSV file path
         self.refresh_rate = 1.0                # data refresh rate in seconds.
-        self.enabled_modules = []  # list of active module names
-        self.module_pin_directories = []  # list of pin directories for each module
+        self.modules = {}
         self.pi_address = None  # IP address of the Pi for communication
 
 
@@ -73,16 +72,12 @@ class PCState:
             experiment_id (str): Unique identifier for the experiment.
         """
         self.current_experiment_id = experiment_id
-    def add_module(self, module_name: str, pin_directory: str):
-        """
-        Add a module to the list of enabled modules.
+    def add_module(self, module_name: str, pin_directory):
 
-        Args:
-            module_name (str): Name of the module to enable.
-        """
-        if module_name not in self.enabled_modules:
-            self.enabled_modules.append(module_name)
-            self.module_pin_directories[module_name] = pin_directory
+        self.modules[module_name] = {
+            "pin_directory": pin_directory,
+            "latest_value": None
+        }
 
 
     # pi interactions---------------------------------------
@@ -116,8 +111,45 @@ class PCState:
         self.experiment_running = False
         return 0 
 
-    #dashboard_data_retrieval-----------------------------------
     def get_latest_data(self, module_name: str):
-        return 0 
 
+        if module_name in self.modules:
+            return self.modules[module_name]["latest_value"]
+
+        return None
+
+    def __str__(self):
+        """
+        Return a human-readable summary of the current PC state.
+        """
+
+        lines = [
+            "========== Experiment Configuration ==========",
+            f"Experiment Running : {self.experiment_running}",
+            f"Experiment Name    : {self.current_experiment_id}",
+            f"Output Folder      : {self.output_file_path}",
+            f"Sample Rate (s)    : {self.refresh_rate}",
+            f"Pi Address         : {self.pi_address}",
+            "",
+            "Modules:"
+        ]
+
+        if not self.modules:
+            lines.append("  None")
+        else:
+            for name, module in self.modules.items():
+
+                lines.append(f"  {name}")
+
+                lines.append(
+                    f"    Latest Value : {module['latest_value']}"
+                )
+
+                lines.append(
+                    f"    Pin Directory: {module['pin_directory']}"
+                )
+
+        return "\n".join(lines)
+
+PC_STATE = PCState()  # Singleton instance of the PCState class, which holds all runtime state for the server. This object is shared across FastAPI endpoints and must be thread-safe.
 

@@ -1,20 +1,24 @@
 from fastapi import APIRouter
-from pc_server_v2 import PC_STATE
+from pc_state import PC_STATE
 router = APIRouter()
 # =========================================================
 # API USER SUBMISSIONS
 # =========================================================
+@router.post("/add_module_to_pc_state")
+def add_module_to_pc_state(module_name: str, data: dict):
 
-#confiuring experiment parameters
-@app.post("/add_module_to_pc_state")
-def add_module_to_pc_state(data: dict):
-    """
-    Add a new module to the PC state with its corresponding pin directory.
-    """
-    PC_STATE.add_module(data["module_name"], data["pin_directory"])
-    return {"status": "success", "message": f"Module {data['module_name']} added with pin directory {data['pin_directory']}"}
+    print("MODULE:", module_name)
+    print("DATA:", data)
 
-@app.post("/load_state_to_pi")
+    PC_STATE.add_module(
+        module_name=module_name,
+        pin_directory=data
+    )
+
+    return {"status": "success"}
+
+    return {"status": "success"}
+@router.post("/load_state_to_pi")
 def load_state_to_pi():
     """
     Send the current PC state to the Pi for synchronization.
@@ -22,34 +26,64 @@ def load_state_to_pi():
     PC_STATE.send_state_to_pi()
     return
 
-@app.post("/load_experiment_config")
-def load_experiment_config():
-    """
-    Send the current PC state to the Pi for synchronization.
-    """
-    #PC_STATE.send_state_to_pi()
-    return
 
-@app.post("/test_measurement")
+@router.post("/load_experiment_config")
+def load_experiment_config(data: dict):
+    """
+    Load experiment settings into the shared PC state.
+    """
+
+    PC_STATE.set_experiment_id(
+        data["Experiment Name"]
+    )
+
+    PC_STATE.set_file_path(
+        data["Data Folder"]
+    )
+
+    PC_STATE.set_sample_name(
+        data["Sample Name"]
+    )
+
+    PC_STATE.set_refresh_rate(
+        data["Sample Rate (s per measurement)"]
+    )
+
+    return {
+        "status": "success"
+    }
+
+@router.post("/test_measurement")
 def test_measurement():
     """
-    
+    Trigger a single measurement.
     """
-    PC_STATE.measure()
-    return 
 
-# Control loop
-@app.post("/start_experiment")
+    PC_STATE.measure()
+
+    return {"status": "success"}
+
+# ---------------------------------------------------------
+# Experiment Control
+# ---------------------------------------------------------
+
+@router.post("/start_experiment")
 def start_experiment():
     """
-    
+    Start experiment loop.
     """
+
     PC_STATE.start_experiment()
-    return 
-@app.post("/stop_experiment")
+
+    return {"status": "success"}
+
+
+@router.post("/stop_experiment")
 def stop_experiment():
     """
-    
+    Stop experiment loop.
     """
+
     PC_STATE.stop_experiment()
-    return
+
+    return {"status": "success"}

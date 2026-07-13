@@ -11,7 +11,7 @@ Purpose:
 
 from fastapi import FastAPI
 from typing import List, Dict, Any
-import pc_state
+from pc_state import PC_STATE
 
 
 
@@ -21,7 +21,6 @@ from endpoints import control_end_points
 
 
 
-PC_STATE = pc_state.PCState()  # Singleton instance of the PCState class, which holds all runtime state for the server. This object is shared across FastAPI endpoints and must be thread-safe.
 
 
 

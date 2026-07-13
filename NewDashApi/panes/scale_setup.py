@@ -37,12 +37,12 @@ class scale_setup(Pane):
         # Send configuration to PC server
         self.send = Button(
             label="Send to PC",
-            endpoint="/api/scale/setup"
+            endpoint="/add_module_to_pc_state?module_name=scale"
         )
 
 
         # Live scale measurement
         self.scale_reading = Display(
             label="Current Scale Reading",
-            source="/api/scale/reading"
+            source="/api/get_data"
         )
