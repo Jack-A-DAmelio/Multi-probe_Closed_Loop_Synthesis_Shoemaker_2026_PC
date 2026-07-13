@@ -4,9 +4,8 @@ from pc_state import PC_STATE
 
 router = APIRouter()
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse
-from pc_state import PC_STATE
+
+
 
 router = APIRouter()
 

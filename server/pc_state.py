@@ -19,6 +19,7 @@ class PCState:
         # Experiment state
         self.experiment_running = False
         self.current_experiment_id = None
+        self.sample_naeme = None
 
         # Data output
         self.output_file_path = None
@@ -26,11 +27,12 @@ class PCState:
 
         # Hardware state
         self.modules = {}
-        self.pi_address = None
+        self.pi_address = "localhost:8001"
 
         # Thread management
         self._experiment_thread = None
         self._lock = threading.Lock()
+        self.camera = None
 
 
     # ---------------------------------------------------------
@@ -40,7 +42,8 @@ class PCState:
     def set_file_path(self, path: str):
         self.output_file_path = path
 
-
+    def set_sample_name(self, sample_name: str):
+        self.sample_name = sample_name
     def set_refresh_rate(self, rate: float):
         self.refresh_rate = rate
 
@@ -55,7 +58,16 @@ class PCState:
             "pin_directory": pin_directory,
             "latest_value": None
         }
+        if module_name == "camera":
+            from camera import Camera
+            self.camera = Camera(pin_directory)
+            Path(self.output_file_path +"/camera").mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
+
+    
 
     # ---------------------------------------------------------
     # PI COMMUNICATION
@@ -66,11 +78,15 @@ class PCState:
         if self.pi_address is None:
             raise RuntimeError("Pi address not configured")
 
+        print("aaaaaa", self.modules)
 
         payload = {
-            "modules": self.modules
+            "modules": {
+                name: module
+                for name, module in self.modules.items()
+                if name != "camera"
+            }
         }
-
 
         response = requests.post(
             f"http://{self.pi_address}/configure",
@@ -78,11 +94,9 @@ class PCState:
             timeout=5
         )
 
-
         response.raise_for_status()
 
         return response.json()
-
 
 
     def measure(self):
@@ -154,95 +168,159 @@ class PCState:
 
         self._experiment_thread.start()
 
+    def _experiment_loop(self):
 
-def _experiment_loop(self):
+        filename = (
+            Path(self.output_file_path)
+            /
+            f"experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
 
-    filename = (
-        Path(self.output_file_path)
-        /
-        f"experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    )
+        camera_folder = (
+            Path(self.output_file_path)
+            /
+            "camera"
+        )
 
-
-    with open(
-        filename,
-        "w",
-        newline=""
-    ) as file:
-
-
-        writer = csv.writer(file)
-
-
-        writer.writerow(
-            [
-                "measurement_name",
-                "measure",
-                "timestamp"
-            ]
+        camera_folder.mkdir(
+            parents=True,
+            exist_ok=True
         )
 
 
-        while self.experiment_running:
+        with open(
+            filename,
+            "w",
+            newline=""
+        ) as file:
 
-            try:
+            writer = csv.writer(file)
 
-                # Request one synchronized measurement cycle from Pi
-                data = self.measure()
-
-
-                timestamp = data.get(
-                    "timestamp",
-                    time.time()
-                )
+            header_written = False
+            measurement_names = []
 
 
-                measurements = data.get(
-                    "measurements",
-                    {}
-                )
+            while self.experiment_running:
 
+                try:
 
-                # Loop through all hardware results
-                for measurement_name, value in measurements.items():
+                    # ---------------------------------------------
+                    # Get synchronized measurements from Pi
+                    # ---------------------------------------------
 
+                    data = self.measure()
 
-                    # Update live dashboard state
-                    with self._lock:
+                    timestamp = data.get(
+                        "timestamp",
+                        time.time()
+                    )
 
-                        if measurement_name in self.modules:
-
-                            self.modules[
-                                measurement_name
-                            ][
-                                "latest_value"
-                            ] = value
-
-
-                    # Save measurement
-                    writer.writerow(
-                        [
-                            measurement_name,
-                            value,
-                            timestamp
-                        ]
+                    measurements = data.get(
+                        "measurements",
+                        {}
                     )
 
 
-                file.flush()
+                    # ---------------------------------------------
+                    # Take camera image
+                    # ---------------------------------------------
+
+                    camera_file = None
+
+                    if self.camera is not None:
+
+                        image, capture_time = self.camera.take_picture()
+
+                        camera_file = (
+                            camera_folder
+                            /
+                            f"image_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.png"
+                        )
+
+                        self.camera.save_file(
+                            image,
+                            str(camera_file)
+                        )
+
+                        # Store relative path in CSV
+                        camera_file = str(
+                            camera_file.relative_to(
+                                self.output_file_path
+                            )
+                        )
 
 
-            except Exception as e:
+                    # ---------------------------------------------
+                    # Update dashboard state
+                    # ---------------------------------------------
 
-                print(
-                    "EXPERIMENT LOOP ERROR:",
-                    repr(e)
+                    with self._lock:
+
+                        for measurement_name, value in measurements.items():
+
+                            if measurement_name in self.modules:
+
+                                self.modules[
+                                    measurement_name
+                                ][
+                                    "latest_value"
+                                ] = value
+
+
+                    # ---------------------------------------------
+                    # Write CSV header once
+                    # ---------------------------------------------
+
+                    if not header_written:
+
+                        measurement_names = list(
+                            measurements.keys()
+                        )
+
+                        writer.writerow(
+                            [
+                                "timestamp",
+                                *measurement_names,
+                                "camera_file"
+                            ]
+                        )
+
+                        header_written = True
+
+
+                    # ---------------------------------------------
+                    # Write one experiment row
+                    # ---------------------------------------------
+
+                    row = [
+                        timestamp
+                    ]
+
+                    for name in measurement_names:
+                        row.append(
+                            measurements.get(name)
+                        )
+
+                    row.append(
+                        camera_file
+                    )
+
+                    writer.writerow(row)
+
+                    file.flush()
+
+
+                except Exception as e:
+
+                    print(
+                        "EXPERIMENT LOOP ERROR:",
+                        repr(e)
+                    )
+
+
+                time.sleep(
+                    self.refresh_rate
                 )
-
-
-            time.sleep(
-                self.refresh_rate
-            )
 
 
     def stop_experiment(self):
@@ -258,8 +336,94 @@ def _experiment_loop(self):
 
 
         self.cleanup()
+    def test_measure(self):
+
+        if self.pi_address is None:
+            raise RuntimeError("Pi address not configured")
 
 
+        # ---------------------------------------------------------
+        # Get measurements from Pi
+        # ---------------------------------------------------------
+
+        response = requests.post(
+            f"http://{self.pi_address}/measure",
+            timeout=5
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        timestamp = data.get(
+            "timestamp",
+            time.time()
+        )
+
+        measurements = data.get(
+            "measurements",
+            {}
+        )
+
+
+        # ---------------------------------------------------------
+        # Update dashboard state
+        # ---------------------------------------------------------
+
+        with self._lock:
+
+            for measurement_name, value in measurements.items():
+
+                if measurement_name in self.modules:
+
+                    self.modules[
+                        measurement_name
+                    ][
+                        "latest_value"
+                    ] = value
+
+
+        # ---------------------------------------------------------
+        # Take camera picture
+        # ---------------------------------------------------------
+
+        camera_file = None
+
+        if self.camera is not None:
+
+            camera_folder = (
+                Path(self.output_file_path)
+                /
+                "camera"
+            )
+
+            camera_folder.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+
+            image, capture_time = self.camera.take_picture()
+
+
+            camera_file = (
+                camera_folder
+                /
+                f"test_image_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.png"
+            )
+
+
+            self.camera.save_file(
+                image,
+                str(camera_file)
+            )
+
+
+        return {
+            "timestamp": timestamp,
+            "measurements": measurements,
+            "camera_file": str(camera_file) if camera_file else None
+        }
 
     # ---------------------------------------------------------
     # Access

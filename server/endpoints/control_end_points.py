@@ -32,11 +32,13 @@ def load_experiment_config(data: dict):
     """
     Load experiment settings into the shared PC state.
     """
-
+    print(data)
     PC_STATE.set_experiment_id(
         data["Experiment Name"]
     )
-
+    PC_STATE.set_sample_name(
+        data["Sample Name"]
+    )
     PC_STATE.set_file_path(
         data["Data Folder"]
     )
@@ -59,7 +61,7 @@ def test_measurement():
     Trigger a single measurement.
     """
 
-    PC_STATE.measure()
+    PC_STATE.test_measure()
 
     return {"status": "success"}
 
