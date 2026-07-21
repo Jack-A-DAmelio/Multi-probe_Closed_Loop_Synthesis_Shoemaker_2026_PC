@@ -1,0 +1,92 @@
+{
+    "input_mode": "image_folder",
+    "image_file_path": "/Users/darrenco/Downloads/test_crystal_image.png",
+    "image_file_paths": [
+        "/Users/darrenco/Downloads/frame_001.png",
+        "/Users/darrenco/Downloads/frame_002.png",
+        "/Users/darrenco/Downloads/frame_003.png"
+    ],
+    "image_folder_path": "/Users/darrenco/Downloads/Xtal Crop",
+    "image_file_extensions": [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tif",
+        ".tiff",
+        ".bmp"
+    ],
+    "sort_image_inputs_by_name": true,
+    "video_file_path": "/Users/darrenco/Downloads/crystal_video.mp4",
+    "output_folder": "/Users/darrenco/Downloads/Crystal_Tracking_Output",
+    "startup_dialog_backend": "auto",
+    "ask_for_output_folder_on_start": true,
+    "ask_for_kmeans_channels_on_start": true,
+    "extracted_frame_folder_name": "extracted_frames",
+    "extract_every_nth_frame": 50,
+    "maximum_frames_to_process": null,
+    "overwrite_extracted_frames": true,
+    "save_extracted_frames": true,
+    "use_video_time": true,
+    "time_start": 0.0,
+    "manual_time_between_saved_frames": 1.0,
+    "time_unit": "s",
+    "area_conversion_factor": 1.0,
+    "area_unit": "converted_area_units",
+    "roi_input_mode": "interactive",
+    "number_of_rois": 1,
+    "manual_rois": [
+        {
+            "roi_index": 1,
+            "center_x": 200.0,
+            "center_y": 200.0,
+            "radius": 100.0
+        }
+    ],
+    "roi_selection_frame": "last",
+    "roi_selection_frame_index": -1,
+    "radius_method": "average",
+    "minimum_roi_size_pixels": 5,
+    "kmeans_channel_names": [
+        "red",
+        "green"
+    ],
+    "tracking_k_value": 3,
+    "kmeans_iterations": 80,
+    "kmeans_random_seed": 0,
+    "kmeans_fit_mode": "reference_frames",
+    "reference_frame_fraction_positions": [
+        0.5,
+        0.75,
+        1.0
+    ],
+    "maximum_pixels_per_reference_frame_for_kmeans_fit": 20000,
+    "maximum_pixels_per_frame_for_kmeans_fit": 5000,
+    "crystal_cluster_selection_mode": "darkest",
+    "manual_crystal_cluster_numbers": [
+        1
+    ],
+    "color_analysis_pixel_filter": "all_roi",
+    "component_connectivity": 2,
+    "minimum_crystal_area_pixels": 40,
+    "max_centroid_shift_pixels": 10.0,
+    "max_relative_area_change": 2.0,
+    "tracking_memory_frames": null,
+    "scale_centroid_shift_with_frame_gap": false,
+    "distance_similarity_weight": 5.0,
+    "area_similarity_weight": 0.25,
+    "track_memory_age_weight": 0.1,
+    "save_per_frame_binary_masks": true,
+    "save_per_frame_tracking_overlays": true,
+    "save_region_coordinates_json": false,
+    "save_growth_plot": true,
+    "save_color_analysis_summary": true,
+    "display_crystal_index_labels": true,
+    "crystal_index_label_margin_pixels": 6,
+    "figure_size": [
+        8,
+        8
+    ],
+    "circle_line_width": 2.5,
+    "preview_dpi": 300,
+    "cluster_overlay_alpha": 0.65
+}
