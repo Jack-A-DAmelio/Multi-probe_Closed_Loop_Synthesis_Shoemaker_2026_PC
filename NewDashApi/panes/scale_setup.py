@@ -2,7 +2,7 @@ from dashboard_framework.pane import Pane
 from dashboard_framework.widgets import (
     Display,
     NumberInput,
-    Button
+    Button, TextInput
 )
 
 
@@ -13,24 +13,36 @@ class scale_setup(Pane):
     def build(self):
 
         # Hardware configuration inputs
-        self.power = NumberInput(
-            label="Power",
-            default=0
+        self.power = TextInput(
+            label="name",
+            default="200g Scale"
+        )
+        self.sda = NumberInput(
+            label="SDA_Pin",
+            default=2
         )
 
-        self.ground = NumberInput(
-            label="Ground",
-            default=0
+        self.scl = NumberInput(
+            label="SCL_Pin",
+            default=3
         )
 
-        self.clock_speed = NumberInput(
-            label="Clock Speed",
-            default=1000
+        self.i2c_address = TextInput(
+            label="i2c_address",
+            default="0x2A"
         )
 
-        self.data_transfer = NumberInput(
-            label="Data Transfer",
-            default=0
+        self.samples = NumberInput(
+            label="Samples",
+            default=10
+        )
+        self.active_channel = NumberInput(
+            label="active_channel",
+            default=1
+        )
+        self.channel = NumberInput(
+            label="channel",
+            default=1
         )
 
 
